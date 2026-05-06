@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"c:\\\\D\\\\babak-works\\\\4-Convert_jpg_png\\\\converter\" \"c:\\\\D\\\\babak-works\\\\4-Convert_jpg_png\\\\ui\")",
+      "Bash(python -c ' *)"
+    ],
+    "additionalDirectories": [
+      "c:\\D\\babak-works\\4-Convert_jpg_png"
+    ]
+  }
+}

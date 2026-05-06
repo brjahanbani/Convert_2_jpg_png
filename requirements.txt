@@ -1,0 +1,18 @@
+# ── Core (required) ────────────────────────────────────────────────────────────
+customtkinter>=5.2.0
+Pillow>=10.0.0
+
+# ── Optional: HEIC / HEIF support ──────────────────────────────────────────────
+# Windows / macOS / Linux:
+#   pip install pillow-heif
+# pillow-heif>=0.13.0
+
+# ── Optional: AVIF support (Pillow < 10 or without libavif) ───────────────────
+# Windows / macOS / Linux:
+#   pip install pillow-avif-plugin
+# pillow-avif-plugin>=1.4.0
+# Note: Pillow 10+ supports AVIF natively when libavif is installed on the system.
+
+# ── Packaging (optional) ────────────────────────────────────────────────────────
+# pip install pyinstaller
+# pyinstaller>=6.0.0

@@ -518,6 +518,8 @@ class App(ctk.CTk):
         self._update_convert_button()
 
     def _update_convert_button(self) -> None:
+        if not hasattr(self, "_convert_btn"):
+            return
         if self._converting:
             self._convert_btn.configure(state="disabled")
             return

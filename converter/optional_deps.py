@@ -12,6 +12,8 @@ def initialize() -> Dict[str, bool]:
         return _deps
     _check_heif()
     _check_avif()
+    _check_rembg()
+    _check_gpu()
     _initialized = True
     return _deps
 
@@ -35,6 +37,22 @@ def _check_avif() -> None:
         _deps["avif"] = ".avif" in Image.registered_extensions()
     except Exception:
         _deps["avif"] = False
+
+
+def _check_rembg() -> None:
+    try:
+        import rembg  # type: ignore  # noqa: F401
+        _deps["rembg"] = True
+    except ImportError:
+        _deps["rembg"] = False
+
+
+def _check_gpu() -> None:
+    try:
+        import onnxruntime as ort  # type: ignore
+        _deps["gpu"] = "CUDAExecutionProvider" in ort.get_available_providers()
+    except ImportError:
+        _deps["gpu"] = False
 
 
 def get_missing_info() -> list[tuple[str, str]]:

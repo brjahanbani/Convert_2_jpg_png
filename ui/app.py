@@ -9,9 +9,12 @@ from typing import Dict, List, Optional
 import customtkinter as ctk
 
 from converter.handlers import FormatHandlerRegistry
+from converter.jewelry_processor import reset_session as _reset_jewelry_session
 from converter.models import (
     ConversionConfig,
     FileResult,
+    JewelryConfig,
+    JEWELRY_MODELS,
     OutputFormat,
     OutputMode,
     ResizeConfig,
@@ -128,6 +131,15 @@ class App(ctk.CTk):
         self._recursive_var = ctk.BooleanVar(value=False)
         self._exif_var = ctk.BooleanVar(value=False)
 
+        # Jewelry mode vars
+        self._jewelry_enabled_var = ctk.BooleanVar(value=False)
+        self._jewelry_model_var = ctk.StringVar(value=JEWELRY_MODELS[0])
+        self._jewelry_gpu_var = ctk.BooleanVar(value=True)
+        self._jewelry_canvas_w_var = ctk.StringVar(value="853")
+        self._jewelry_canvas_h_var = ctk.StringVar(value="1280")
+        self._jewelry_margin_var = ctk.IntVar(value=8)
+        self._jewelry_alpha_matting_var = ctk.BooleanVar(value=False)
+
     def _setup_window(self) -> None:
         self.title("Bulk Image Converter")
         self.geometry("980x900")
@@ -145,6 +157,7 @@ class App(ctk.CTk):
         self._build_file_section(outer)
         self._build_middle_row(outer)
         self._build_output_section(outer)
+        self._build_jewelry_section(outer)
         self._build_action_section(outer)
         self._build_log_section(outer)
 
@@ -337,6 +350,112 @@ class App(ctk.CTk):
         ctk.CTkCheckBox(exif_row, text="Preserve EXIF metadata", variable=self._exif_var).pack(side="left")
 
         self._update_output_ui()
+
+    # ------------------------------------------------------------------ jewelry section
+
+    def _build_jewelry_section(self, parent: ctk.CTkFrame) -> None:
+        sec = self._section(parent, "Jewelry Mode  (background removal + auto-centering)")
+        self._jewelry_sec = sec
+
+        rembg_ok = self._deps.get("rembg", False)
+        gpu_ok = self._deps.get("gpu", False)
+
+        if not rembg_ok:
+            ctk.CTkLabel(
+                sec,
+                text="rembg not installed — run:  pip install rembg[gpu]",
+                text_color=("orange", "orange"),
+            ).grid(row=1, column=0, sticky="w", padx=10, pady=(0, 8))
+            return
+
+        # Row 1 — enable toggle + GPU badge
+        row1 = ctk.CTkFrame(sec, fg_color="transparent")
+        row1.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 4))
+
+        ctk.CTkCheckBox(
+            row1, text="Enable jewelry pipeline", variable=self._jewelry_enabled_var,
+            command=self._on_jewelry_toggle,
+        ).pack(side="left", padx=(0, 16))
+
+        gpu_label = "GPU available ✓" if gpu_ok else "GPU not detected (CPU will be used)"
+        gpu_color = ("green3", "light green") if gpu_ok else ("gray50", "gray60")
+        ctk.CTkLabel(row1, text=gpu_label, text_color=gpu_color,
+                     font=ctk.CTkFont(size=11)).pack(side="left")
+
+        # Row 2 — model selector + alpha matting
+        row2 = ctk.CTkFrame(sec, fg_color="transparent")
+        row2.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 4))
+        ctk.CTkLabel(row2, text="Model:").pack(side="left", padx=(0, 6))
+        self._jewelry_model_menu = ctk.CTkOptionMenu(
+            row2, values=JEWELRY_MODELS, variable=self._jewelry_model_var,
+            command=lambda _: _reset_jewelry_session(), width=200,
+        )
+        self._jewelry_model_menu.pack(side="left", padx=(0, 20))
+
+        self._jewelry_alpha_cb = ctk.CTkCheckBox(
+            row2, text="Alpha matting (better edges, slower)",
+            variable=self._jewelry_alpha_matting_var,
+        )
+        self._jewelry_alpha_cb.pack(side="left")
+
+        # Row 3 — canvas dimensions + margin
+        row3 = ctk.CTkFrame(sec, fg_color="transparent")
+        row3.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 4))
+
+        ctk.CTkLabel(row3, text="Canvas W:").pack(side="left")
+        self._jewelry_cw_entry = ctk.CTkEntry(
+            row3, textvariable=self._jewelry_canvas_w_var, width=70, placeholder_text="853"
+        )
+        self._jewelry_cw_entry.pack(side="left", padx=(4, 12))
+
+        ctk.CTkLabel(row3, text="H:").pack(side="left")
+        self._jewelry_ch_entry = ctk.CTkEntry(
+            row3, textvariable=self._jewelry_canvas_h_var, width=70, placeholder_text="1280"
+        )
+        self._jewelry_ch_entry.pack(side="left", padx=(4, 20))
+
+        ctk.CTkLabel(row3, text="Margin %:").pack(side="left", padx=(0, 6))
+        self._jewelry_margin_slider = ctk.CTkSlider(
+            row3, from_=0, to=25, number_of_steps=25,
+            variable=self._jewelry_margin_var,
+            command=lambda v: self._jewelry_margin_lbl.configure(text=f"{int(v)}%"),
+            width=120,
+        )
+        self._jewelry_margin_slider.pack(side="left")
+        self._jewelry_margin_lbl = ctk.CTkLabel(row3, text="8%", width=36)
+        self._jewelry_margin_lbl.pack(side="left", padx=(4, 0))
+
+        # Row 4 — GPU toggle (only if GPU available)
+        if gpu_ok:
+            row4 = ctk.CTkFrame(sec, fg_color="transparent")
+            row4.grid(row=4, column=0, sticky="ew", padx=10, pady=(0, 8))
+            self._jewelry_gpu_cb = ctk.CTkCheckBox(
+                row4, text="Use GPU acceleration", variable=self._jewelry_gpu_var,
+                command=lambda: _reset_jewelry_session(),
+            )
+            self._jewelry_gpu_cb.pack(side="left")
+        else:
+            self._jewelry_gpu_var.set(False)
+
+        # collect all jewelry controls for enable/disable
+        self._jewelry_controls = [
+            self._jewelry_model_menu,
+            self._jewelry_alpha_cb,
+            self._jewelry_cw_entry,
+            self._jewelry_ch_entry,
+            self._jewelry_margin_slider,
+        ]
+        if gpu_ok and hasattr(self, "_jewelry_gpu_cb"):
+            self._jewelry_controls.append(self._jewelry_gpu_cb)
+
+        self._on_jewelry_toggle()  # set initial state
+
+    def _on_jewelry_toggle(self) -> None:
+        enabled = self._jewelry_enabled_var.get()
+        state = "normal" if enabled else "disabled"
+        for ctrl in getattr(self, "_jewelry_controls", []):
+            ctrl.configure(state=state)
+        self._update_convert_button()
 
     # ------------------------------------------------------------------ action section
 
@@ -556,6 +675,20 @@ class App(ctk.CTk):
         folder = Path(self._folder_var.get().strip()) if self._folder_var.get().strip() else None
         suffix = self._suffix_var.get() or "_converted"
 
+        jewelry: Optional[JewelryConfig] = None
+        if self._jewelry_enabled_var.get() and self._deps.get("rembg", False):
+            cw = _int_or_none(self._jewelry_canvas_w_var.get()) or 853
+            ch = _int_or_none(self._jewelry_canvas_h_var.get()) or 1280
+            jewelry = JewelryConfig(
+                enabled=True,
+                bg_model=self._jewelry_model_var.get(),
+                use_gpu=self._jewelry_gpu_var.get() and self._deps.get("gpu", False),
+                canvas_width=cw,
+                canvas_height=ch,
+                margin_pct=self._jewelry_margin_var.get() / 100.0,
+                alpha_matting=self._jewelry_alpha_matting_var.get(),
+            )
+
         return ConversionConfig(
             output_format=fmt,
             jpeg_quality=self._quality_var.get(),
@@ -565,6 +698,7 @@ class App(ctk.CTk):
             output_folder=folder,
             alongside_suffix=suffix,
             preserve_exif=self._exif_var.get(),
+            jewelry=jewelry,
         )
 
     def _validate_before_convert(self, config: ConversionConfig) -> bool:

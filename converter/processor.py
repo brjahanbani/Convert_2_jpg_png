@@ -10,6 +10,7 @@ from typing import Callable, Optional
 from PIL import Image, ImageOps
 
 from .handlers import FormatHandlerRegistry
+from .jewelry_processor import apply_jewelry_pipeline
 from .models import ConversionConfig, FileResult, OutputFormat, OutputMode, ResizeMode
 
 
@@ -157,10 +158,17 @@ def _transform_image(
 
     exif: Optional[bytes] = img.info.get("exif")
 
-    try:
-        img = _apply_resize(img, config)
-    except Exception as exc:
-        return _make_error(path, f"Resize failed for {path.name}: {exc}", start)
+    # Jewelry pipeline: bg removal + centering replaces the standard resize step.
+    if config.jewelry and config.jewelry.enabled:
+        try:
+            img = apply_jewelry_pipeline(img, config.jewelry)
+        except Exception as exc:
+            return _make_error(path, f"Jewelry pipeline failed for {path.name}: {exc}", start)
+    else:
+        try:
+            img = _apply_resize(img, config)
+        except Exception as exc:
+            return _make_error(path, f"Resize failed for {path.name}: {exc}", start)
 
     img = _convert_mode(img, config.output_format)
     return img, exif
@@ -211,7 +219,12 @@ class BatchProcessor:
         config: ConversionConfig,
         progress_cb: Callable[[FileResult, int, int], None],
     ) -> None:
-        max_workers = max(1, (os.cpu_count() or 2) - 1)
+        # Jewelry mode holds large decoded images in memory during inference.
+        # Cap parallelism to 2 to prevent OOM on high-resolution inputs.
+        if config.jewelry and config.jewelry.enabled:
+            max_workers = 2
+        else:
+            max_workers = max(1, (os.cpu_count() or 2) - 1)
         total = len(paths)
         result_q: queue.Queue[FileResult] = queue.Queue()
 

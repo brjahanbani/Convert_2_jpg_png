@@ -13,6 +13,23 @@ Pillow>=10.0.0
 # pillow-avif-plugin>=1.4.0
 # Note: Pillow 10+ supports AVIF natively when libavif is installed on the system.
 
+# ── Jewelry pipeline: background removal (optional) ────────────────────────────
+# CPU only:
+#   pip install rembg
+# GPU (CUDA) — significantly faster for large batches:
+#   pip install rembg[gpu]
+# rembg>=2.0.50
+#
+# rembg bundles onnxruntime (CPU) or requires onnxruntime-gpu for CUDA.
+# On first use, rembg auto-downloads the selected model (~170 MB for u2net).
+# Models are cached in ~/.u2net/ and reused across runs.
+#
+# Recommended models (quality ↔ speed tradeoff):
+#   u2net              – general purpose, good quality, fast       (~170 MB)
+#   isnet-general-use  – faster, slightly lower quality            (~180 MB)
+#   birefnet-general   – higher quality, slower                    (~370 MB)
+#   birefnet-hires     – best quality, slowest, needs more VRAM    (~370 MB)
+
 # ── Packaging (optional) ────────────────────────────────────────────────────────
 # pip install pyinstaller
 # pyinstaller>=6.0.0
